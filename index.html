@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🐦 Kuş Avı</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: #1a0533;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  #gameWrapper {
+    position: relative;
+    width: min(400px, 100vw);
+    height: min(700px, 100vh);
+    overflow: hidden;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+  }
+
+  #ui {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .stat-box {
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid rgba(255,255,255,0.15);
+    border-radius: 14px;
+    padding: 6px 14px;
+    color: #fff;
+    font-family: 'Fredoka One', cursive;
+  }
+
+  .stat-box .label { font-size: 10px; opacity: 0.7; letter-spacing: 1px; text-transform: uppercase; }
+  .stat-box .value { font-size: 24px; line-height: 1.1; }
+  .stat-box .value.score-val { color: #FFD700; }
+  .stat-box .value.lives-val { color: #FF6B6B; }
+  .stat-box .value.level-val { color: #7EF7CC; }
+
+  #ammoBar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 7px;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .bullet {
+    width: 12px; height: 22px;
+    background: linear-gradient(180deg, #FFD700, #FF8C00);
+    border-radius: 6px 6px 3px 3px;
+    box-shadow: 0 0 6px rgba(255,200,0,0.5);
+    transition: all 0.2s;
+  }
+
+  .bullet.empty {
+    background: rgba(255,255,255,0.1);
+    box-shadow: none;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 20;
+    background: rgba(10, 2, 25, 0.88);
+    backdrop-filter: blur(6px);
+    text-align: center;
+    padding: 30px;
+  }
+
+  #overlay h1 {
+    font-family: 'Fredoka One', cursive;
+    font-size: 48px;
+    color: #FFD700;
+    text-shadow: 0 0 30px rgba(255,215,0,0.6), 0 3px 0 rgba(0,0,0,0.5);
+    margin-bottom: 8px;
+  }
+
+  #overlay .bird-icon {
+    font-size: 72px;
+    animation: float 2s ease-in-out infinite;
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0) rotate(-5deg); }
+    50% { transform: translateY(-12px) rotate(5deg); }
+  }
+
+  #overlay p {
+    color: rgba(255,255,255,0.75);
+    font-size: 15px;
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+
+  #overlay .final-score {
+    font-family: 'Fredoka One', cursive;
+    font-size: 28px;
+    color: #7EF7CC;
+    margin-bottom: 6px;
+  }
+
+  #overlay .high-score {
+    font-size: 14px;
+    color: rgba(255,215,0,0.7);
+    margin-bottom: 24px;
+  }
+
+  .btn {
+    font-family: 'Fredoka One', cursive;
+    font-size: 20px;
+    padding: 14px 48px;
+    border: none;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(255,100,80,0.5), 0 2px 0 rgba(0,0,0,0.3);
+    transition: all 0.15s;
+    touch-action: manipulation;
+    user-select: none;
+  }
+
+  .btn:active { transform: scale(0.95) translateY(2px); box-shadow: 0 2px 8px rgba(255,100,80,0.4); }
+
+  #reloadBtn {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    z-index: 10;
+    font-family: 'Fredoka One', cursive;
+    font-size: 13px;
+    padding: 8px 14px;
+    border: 1.5px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    background: rgba(0,0,0,0.4);
+    color: rgba(255,255,255,0.8);
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    touch-action: manipulation;
+  }
+
+  #reloadBtn:active { transform: scale(0.92); }
+  #reloadBtn.reloading { color: #FFD700; border-color: rgba(255,215,0,0.5); }
+
+  #levelBanner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Fredoka One', cursive;
+    font-size: 36px;
+    color: #FFD700;
+    text-shadow: 0 0 20px rgba(255,215,0,0.8);
+    z-index: 15;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+</style>
+</head>
+<body>
+<div id="gameWrapper">
+  <canvas id="canvas"></canvas>
+
+  <div id="ui">
+    <div class="stat-box">
+      <div class="label">Skor</div>
+      <div class="value score-val" id="scoreDisplay">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="label">Seviye</div>
+      <div class="value level-val" id="levelDisplay">1</div>
+    </div>
+    <div class="stat-box">
+      <div class="label">Can</div>
+      <div class="value lives-val" id="livesDisplay">❤️❤️❤️</div>
+    </div>
+  </div>
+
+  <div id="ammoBar"></div>
+
+  <button id="reloadBtn">🔄 Doldur</button>
+
+  <div id="levelBanner"></div>
+
+  <div id="overlay">
+    <span class="bird-icon">🐦</span>
+    <h1>Kuş Avı</h1>
+    <p>Uçan kuşlara dokun ya da tıkla!<br>Her seviyede hız artar.<br>Kaçan kuş = can kaybı 💔</p>
+    <button class="btn" id="startBtn">Oyna!</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const wrapper = document.getElementById('gameWrapper');
+
+function resize() {
+  canvas.width = wrapper.clientWidth;
+  canvas.height = wrapper.clientHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+let W, H, birds = [], particles = [], score = 0, lives = 3, level = 1,
+    ammo = 6, maxAmmo = 6, reloading = false, gameRunning = false,
+    highScore = +localStorage.getItem('birdHS') || 0,
+    frameId, lastTime = 0, bgStars = [], clouds = [];
+
+function initBg() {
+  bgStars = Array.from({length: 60}, () => ({
+    x: Math.random(), y: Math.random(),
+    r: Math.random() * 1.5 + 0.5,
+    a: Math.random() * 0.8 + 0.2
+  }));
+  clouds = Array.from({length: 5}, (_, i) => ({
+    x: Math.random(), y: 0.1 + Math.random() * 0.35,
+    w: 60 + Math.random() * 80, speed: 0.00008 + Math.random() * 0.00005
+  }));
+}
+
+function spawnBird() {
+  const W = canvas.width, H = canvas.height;
+  const fromLeft = Math.random() < 0.5;
+  const speed = (1.2 + level * 0.35 + Math.random() * 0.8) * (W / 400);
+  const y = H * (0.1 + Math.random() * 0.55);
+  const emojis = ['🐦','🦅','🦉','🦜','🐤','🦚'];
+  birds.push({
+    x: fromLeft ? -50 : W + 50,
+    y, vy: (Math.random() - 0.5) * 1.5,
+    vx: fromLeft ? speed : -speed,
+    size: 28 + Math.floor(Math.random() * 16),
+    emoji: emojis[Math.floor(Math.random() * emojis.length)],
+    flap: 0, flapDir: 1, hit: false, hitAnim: 0,
+    wobble: Math.random() * Math.PI * 2,
+    wobbleSpeed: 0.04 + Math.random() * 0.03,
+    points: 0
+  });
+  const b = birds[birds.length-1];
+  b.points = b.size < 34 ? 30 : b.size < 40 ? 20 : 10;
+}
+
+function spawnCloud() {
+  clouds.push({
+    x: -0.1, y: 0.08 + Math.random() * 0.38,
+    w: 60 + Math.random() * 90, speed: 0.00006 + Math.random() * 0.00006
+  });
+  if (clouds.length > 7) clouds.shift();
+}
+
+function burst(x, y, emoji) {
+  for (let i = 0; i < 8; i++) {
+    const angle = (Math.PI * 2 / 8) * i + Math.random() * 0.5;
+    const spd = 2 + Math.random() * 3;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd - 2,
+      life: 1, emoji: Math.random() < 0.5 ? '✨' : '⭐',
+      size: 14 + Math.random() * 10
+    });
+  }
+  particles.push({ x, y: y - 20, popup: true, text: '+' + (emoji || 10), life: 1, vy: -1.5 });
+}
+
+function drawBg() {
+  const W = canvas.width, H = canvas.height;
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0D0B2B');
+  grad.addColorStop(0.5, '#1B2A6B');
+  grad.addColorStop(1, '#2E5EA8');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  bgStars.forEach(s => {
+    ctx.globalAlpha = s.a;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(s.x * W, s.y * H * 0.65, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#FFFACD';
+  ctx.shadowColor = '#FFFACD';
+  ctx.shadowBlur = 20;
+  ctx.beginPath();
+  ctx.arc(W * 0.82, H * 0.12, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1B2A6B';
+  ctx.beginPath();
+  ctx.arc(W * 0.85, H * 0.10, 18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  clouds.forEach(c => {
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#fff';
+    const cx = c.x * W, cy = c.y * H, cw = c.w;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, cw / 2, 16, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx - cw * 0.25, cy + 6, cw * 0.28, 12, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + cw * 0.25, cy + 4, cw * 0.32, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+
+  const gGrad = ctx.createLinearGradient(0, H * 0.78, 0, H);
+  gGrad.addColorStop(0, '#1A5C2A');
+  gGrad.addColorStop(1, '#0D3A18');
+  ctx.fillStyle = gGrad;
+  ctx.fillRect(0, H * 0.78, W, H * 0.22);
+
+  ctx.fillStyle = '#0A2E12';
+  for (let i = 0; i < 12; i++) {
+    const tx = (W / 11) * i - 10;
+    const th = 30 + (i * 37 % 35);
+    ctx.beginPath();
+    ctx.moveTo(tx, H * 0.78);
+    ctx.lineTo(tx + 18, H * 0.78 - th);
+    ctx.lineTo(tx + 36, H * 0.78);
+    ctx.fill();
+  }
+}
+
+function drawBirds(dt) {
+  birds.forEach(b => {
+    b.flap += dt * 0.012 * b.flapDir;
+    if (b.flap > 0.3 || b.flap < -0.1) b.flapDir *= -1;
+    b.wobble += b.wobbleSpeed;
+    b.y += Math.sin(b.wobble) * 0.4;
+    if (b.hit) { b.hitAnim += dt * 0.015; }
+
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    if (b.vx < 0) ctx.scale(-1, 1);
+    if (b.hit) {
+      ctx.rotate(b.hitAnim * 0.15);
+      ctx.globalAlpha = Math.max(0, 1 - b.hitAnim * 0.05);
+    }
+    ctx.font = `${b.size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(b.emoji, 0, 0);
+    ctx.restore();
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life;
+    if (p.popup) {
+      ctx.font = 'bold 18px "Fredoka One", cursive';
+      ctx.fillStyle = '#FFD700';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.text, p.x, p.y);
+    } else {
+      ctx.font = `${p.size}px serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(p.emoji, p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
+  });
+}
+
+let spawnTimer = 0, cloudTimer = 0;
+function update(dt) {
+  const W = canvas.width, H = canvas.height;
+  clouds.forEach(c => { c.x += c.speed * dt; });
+  cloudTimer += dt;
+  if (cloudTimer > 8000) { cloudTimer = 0; spawnCloud(); }
+
+  spawnTimer += dt;
+  const si = Math.max(600, 2200 - level * 120);
+  if (spawnTimer > si) {
+    spawnTimer = 0;
+    spawnBird();
+    if (Math.random() < 0.3 + level * 0.05) setTimeout(spawnBird, 400);
+  }
+
+  for (let i = birds.length - 1; i >= 0; i--) {
+    const b = birds[i];
+    b.x += b.vx * (dt / 16);
+    if (!b.hit && (b.x < -80 || b.x > W + 80)) {
+      birds.splice(i, 1);
+      loseLife();
+      continue;
+    }
+    if (b.hit && b.hitAnim > 20) { birds.splice(i, 1); }
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += (p.vx || 0) * (dt / 16);
+    p.y += (p.vy || 0) * (dt / 16);
+    p.life -= dt * 0.002;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function loop(ts) {
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBg();
+  drawBirds(dt);
+  drawParticles();
+  update(dt);
+  if (gameRunning) frameId = requestAnimationFrame(loop);
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  if (e.touches) {
+    return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+  }
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}
+
+function shoot(e) {
+  if (!gameRunning) return;
+  e.preventDefault();
+  if (ammo <= 0 || reloading) { shakeAmmo(); return; }
+
+  const pos = getPos(e);
+  let hit = false;
+
+  for (let i = birds.length - 1; i >= 0; i--) {
+    const b = birds[i];
+    if (b.hit) continue;
+    const dx = b.x - pos.x, dy = b.y - pos.y;
+    if (Math.sqrt(dx * dx + dy * dy) < b.size * 0.9) {
+      b.hit = true;
+      b.vx *= 0.2; b.vy = 3;
+      score += b.points;
+      burst(b.x, b.y, b.points);
+      updateScore();
+      checkLevel();
+      hit = true;
+      break;
+    }
+  }
+
+  particles.push({ x: pos.x, y: pos.y, emoji: '💥', vx: 0, vy: -1, life: 0.6, size: 22, popup: false });
+  ammo--;
+  updateAmmo();
+  if (!hit && ammo === 0) setTimeout(autoReload, 800);
+}
+
+function shakeAmmo() {
+  const bar = document.getElementById('ammoBar');
+  bar.style.animation = 'none';
+  bar.offsetHeight;
+  bar.style.animation = 'shake 0.3s ease';
+}
+
+function autoReload() { if (ammo > 0) return; startReload(); }
+
+function startReload() {
+  if (reloading || ammo === maxAmmo) return;
+  reloading = true;
+  const btn = document.getElementById('reloadBtn');
+  btn.classList.add('reloading');
+  btn.textContent = '⏳ Dolduruluyor...';
+  setTimeout(() => {
+    ammo = maxAmmo; reloading = false;
+    btn.classList.remove('reloading');
+    btn.textContent = '🔄 Doldur';
+    updateAmmo();
+  }, Math.max(600, 1500 - level * 80));
+}
+
+function updateScore() { document.getElementById('scoreDisplay').textContent = score; }
+function updateAmmo() {
+  const bar = document.getElementById('ammoBar');
+  bar.innerHTML = '';
+  for (let i = 0; i < maxAmmo; i++) {
+    const d = document.createElement('div');
+    d.className = 'bullet' + (i >= ammo ? ' empty' : '');
+    bar.appendChild(d);
+  }
+}
+function updateLives() {
+  document.getElementById('livesDisplay').textContent = '❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, 3 - lives));
+}
+
+function loseLife() {
+  if (lives <= 0) return;
+  lives--;
+  updateLives();
+  const fl = document.createElement('div');
+  fl.style.cssText = 'position:absolute;inset:0;background:rgba(255,0,0,0.25);z-index:5;pointer-events:none;';
+  wrapper.appendChild(fl);
+  setTimeout(() => fl.remove(), 300);
+  if (lives <= 0) setTimeout(gameOver, 400);
+}
+
+function checkLevel() {
+  const thresholds = [0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200];
+  const nl = thresholds.findIndex(t => score < t);
+  const newLevel = nl === -1 ? thresholds.length : nl;
+  if (newLevel > level) {
+    level = newLevel;
+    document.getElementById('levelDisplay').textContent = level;
+    const b = document.getElementById('levelBanner');
+    b.textContent = '🎉 Seviye ' + level + '!';
+    b.style.opacity = '1';
+    setTimeout(() => { b.style.opacity = '0'; }, 1800);
+  }
+}
+
+function startGame() {
+  birds = []; particles = [];
+  score = 0; lives = 3; level = 1; ammo = maxAmmo;
+  reloading = false; spawnTimer = 0; cloudTimer = 0;
+  initBg();
+  updateScore(); updateLives(); updateAmmo();
+  document.getElementById('levelDisplay').textContent = '1';
+  document.getElementById('overlay').style.display = 'none';
+  gameRunning = true;
+  lastTime = performance.now();
+  frameId = requestAnimationFrame(loop);
+}
+
+function gameOver() {
+  gameRunning = false;
+  cancelAnimationFrame(frameId);
+  if (score > highScore) { highScore = score; localStorage.setItem('birdHS', highScore); }
+  const ov = document.getElementById('overlay');
+  ov.innerHTML = `
+    <span class="bird-icon">😵</span>
+    <h1>Oyun Bitti!</h1>
+    <div class="final-score">Skor: ${score}</div>
+    <div class="high-score">🏆 En Yüksek: ${highScore}</div>
+    <p>Seviye ${level}'e ulaştın!</p>
+    <button class="btn" id="startBtn">Tekrar Oyna</button>
+  `;
+  ov.style.display = 'flex';
+  document.getElementById('startBtn').addEventListener('click', startGame);
+}
+
+canvas.addEventListener('click', shoot);
+canvas.addEventListener('touchstart', shoot, { passive: false });
+document.getElementById('reloadBtn').addEventListener('click', startReload);
+document.getElementById('reloadBtn').addEventListener('touchstart', e => { e.preventDefault(); startReload(); });
+document.getElementById('startBtn').addEventListener('click', startGame);
+
+const style = document.createElement('style');
+style.textContent = `@keyframes shake { 0%,100%{transform:translateX(-50%) translateX(0)} 25%{transform:translateX(-50%) translateX(-6px)} 75%{transform:translateX(-50%) translateX(6px)} }`;
+document.head.appendChild(style);
+
+initBg();
+requestAnimationFrame(ts => {
+  lastTime = ts;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBg();
+});
+</script>
+</body>
+</html>
